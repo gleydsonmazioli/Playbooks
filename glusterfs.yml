@@ -1,0 +1,78 @@
+---
+# Instalacao do GlusterFS Para distribuicoes baseadas em APT (Debian 9 e superiores)
+# Autor: Gleydson Mazioli <gleydson@guiafoca.org>
+# Data: 21/06/2020
+#
+# Parametros de linha de comando:
+#
+# Como usar:
+# ansible-playbook glusterfs.yml -i /etc/ansible/hosts -e l_inv=glusterfs -e l_user=guiafoca
+#
+
+# Instalacao do GlusterFS
+- hosts: "{{ l_inv }}"
+  gather_facts: true
+  remote_user: "{{ l_user }}"
+  become: yes
+  become_method: su
+  become_user: root
+  pre_tasks:
+    - name: Instala python
+      raw: test -e /usr/bin/python3 || (apt-get -y update && apt-get install -y python3-minimal)
+      changed_when: false
+
+    - name: Obtem facts como pre_task
+      setup:
+
+  tasks:
+    - name: Atualizando o cache do apt
+      apt: 
+        update_cache: yes
+        force_apt_get: yes
+        cache_valid_time: 300
+
+    - name: Instalando pacote wget / gpg via apt
+      apt:
+          force_apt_get: yes
+          state: present
+          pkg:
+           - wget
+           - gpg
+
+    - name: Adicionando chave do GlusterFS
+      apt_key:
+         url: https://download.gluster.org/pub/gluster/glusterfs/7/rsa.pub
+         state: present
+
+    - name: Adicionando repositorio apt no sources.list
+      apt_repository:
+        repo: deb [arch=amd64] https://download.gluster.org/pub/gluster/glusterfs/7/LATEST/Debian/{{ansible_distribution_release}}/amd64/apt {{ansible_distribution_release}} main
+        state: present
+
+    - name: Atualizando o cache do apt
+      apt: 
+        update_cache: yes
+        force_apt_get: yes
+        cache_valid_time: 300
+
+    - name: Instalando pacotes glusterfs via apt
+      apt:
+          force_apt_get: yes
+          state: present
+          pkg:
+            - glusterfs-server 
+            - glusterfs-client
+
+    - name: Ativa o servico glusterd
+      systemd:
+        name: "glusterd"
+        state: started
+        enabled: yes
+      ignore_errors: true
+
+    - name: Inicia o servico GlusterFD
+      service:
+        name: "glusterd"
+        state: started
+
+...
